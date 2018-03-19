@@ -7,7 +7,7 @@ import java.util.concurrent.locks.LockSupport;
  * Created by Administrator on 2018/3/12.
  * 这个是为了测试LockSupport.park()方法与LockSupport.unpart()
  */
-public class Lock2Test {
+public class LockSupportTest2 {
 
     public static void main(String[] arg) {
 
