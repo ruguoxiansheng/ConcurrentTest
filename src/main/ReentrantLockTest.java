@@ -1,14 +1,12 @@
 package main;
 
-import java.util.concurrent.locks.ReentrantLock;
-
 /**
  * Created by Administrator on 2018/3/8.
  * 这个测试是为了试验，公平锁与非公平锁入队列之后的操作顺序。
  * 结果表明，公平锁与非公平锁一旦入到队列之后，会按照顺序一个一个解锁操作
  * 非公平锁的非公平性就体现在其他线程会与入队的线程进行竞争锁。
  */
-public class LockTest {
+public class ReentrantLockTest {
 
     private ReentrantLockMine reentrantLock = new ReentrantLockMine(false);
 
@@ -28,7 +26,7 @@ public class LockTest {
     }
 
     public static void main(String[] args) {
-        LockTest lt = new LockTest();
+        ReentrantLockTest lt = new ReentrantLockTest();
         System.out.println("开始执行！");
         for (int i =0 ; i < 4;i++) {
             new Thread(){
