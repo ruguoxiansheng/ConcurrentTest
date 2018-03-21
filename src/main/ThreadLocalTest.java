@@ -14,6 +14,7 @@ public class ThreadLocalTest {
             int a = (int) (Math.random() * 100D);
 //            int b= (int) (Math.random() * 100D);
             System.out.println("thread name:"+Thread.currentThread().getName()+";set value1="+a/*+";value2="+b*/);
+            threadLocal.get();
             threadLocal.set(a);
 //            threadLocal.set(b);
             try {
@@ -29,13 +30,13 @@ public class ThreadLocalTest {
 
         MyRunnable sharedRunnableInstance = new MyRunnable();
         Thread thread1 = new Thread(sharedRunnableInstance);
-        Thread thread2 = new Thread(sharedRunnableInstance);
+//        Thread thread2 = new Thread(sharedRunnableInstance);
         thread1.setName("thread1");
-        thread2.setName("thread2");
+//        thread2.setName("thread2");
 
         // 两个线程，分别在自己的线程局部变量中放置了一个数，最后取出来也是不一样的。
         thread1.start();
-        thread2.start();
+//        thread2.start();
 
     }
 }
