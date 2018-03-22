@@ -220,7 +220,7 @@ final boolean apparentlyFirstQueuedIsExclusive() {
                         // 如果前置节点是头节点，那么就要tryAcquireShared(arg)
                         if (p == head) {
                             int r = tryAcquireShared(arg);
-                            // r>0
+                            // r>0说明获取到共享模式的锁
                             if (r >= 0) {
                                 setHeadAndPropagate(node, r);
                                 p.next = null; // help GC
@@ -274,6 +274,7 @@ final boolean apparentlyFirstQueuedIsExclusive() {
                         (h = head) == null || h.waitStatus < 0) {
                         Node s = node.next;
                         if (s == null || s.isShared())
+                        // 如果共享锁的下一个节点也是共享模式的节点，那么通知释放下一个节点
                             doReleaseShared();
                     }
                 }
@@ -307,11 +308,11 @@ final boolean apparentlyFirstQueuedIsExclusive() {
                 // 如果h.waitStatus=-1，则设置成0，返回true
                     if (!compareAndSetWaitStatus(h, Node.SIGNAL, 0))
                         continue;            // loop to recheck cases
-                        // 释放头结点的下一个线程
+                        // 释放头结点的下一个共享模式的线程
                     unparkSuccessor(h);
                 }
                 else if (ws == 0 &&
-                // 如果ws==0,则设置成-1，表示下一个传输进行来共享模式的线程节点无条件传递
+                // 如果ws==0,则设置成-3，表示下一个传输进行来共享模式的线程节点无条件传递
                          !compareAndSetWaitStatus(h, 0, Node.PROPAGATE))
                     continue;                // loop on failed CAS
             }
@@ -320,4 +321,41 @@ final boolean apparentlyFirstQueuedIsExclusive() {
                 break;
         }
     }
+
+
+    ///-----释放锁，返回true,说明释放一把读锁成功----------
+    protected final boolean tryReleaseShared(int unused) {
+                Thread current = Thread.currentThread();
+                if (firstReader == current) {
+                    // assert firstReaderHoldCount > 0;
+                    if (firstReaderHoldCount == 1)
+                        firstReader = null;
+                    else
+                        firstReaderHoldCount--;
+                } else {
+                    HoldCounter rh = cachedHoldCounter;
+                    if (rh == null || rh.tid != getThreadId(current))
+                        rh = readHolds.get();
+                    int count = rh.count;
+                    // count <= 1，说明当前的线程没有重入
+                    if (count <= 1) {
+                    // 没有重入就将当前线程从readHolds中移除
+                        readHolds.remove();
+                        if (count <= 0)
+                            throw unmatchedUnlockException();
+                    }
+                    --rh.count;
+                }
+                for (;;) {
+                    int c = getState();
+                    // 减去一个读锁，剩下的读锁
+                    int nextc = c - SHARED_UNIT;
+                    // compareAndSetState(c, nextc)
+                    if (compareAndSetState(c, nextc))
+                        // Releasing the read lock has no effect on readers,
+                        // but it may allow waiting writers to proceed if
+                        // both read and write locks are now free.
+                        return nextc == 0;
+                }
+            }
 
