@@ -302,18 +302,21 @@ final boolean apparentlyFirstQueuedIsExclusive() {
         for (;;) {
             Node h = head;
             // 如果队列不为空
-            if (h != null && h != tail) {
+            if (h != null && h != tail) {  （1）
                 int ws = h.waitStatus;
                 if (ws == Node.SIGNAL) {
                 // 如果h.waitStatus=-1，则设置成0，返回true
                     if (!compareAndSetWaitStatus(h, Node.SIGNAL, 0))
                         continue;            // loop to recheck cases
-                        // 释放头结点的下一个共享模式的线程
+                        // 设置头节点的ws=0成功之后，释放头结点的下一个线程节点
+                        // 下一个节点竞争锁成功之后，会调用setHead(node)方法，更改头节点
+                        // 考虑两种情况：1、头节点没有被更改；2、头节点被更改了。
                     unparkSuccessor(h);
                 }
                 else if (ws == 0 &&
                 // 如果ws==0,则设置成-3，表示下一个传输进行来共享模式的线程节点无条件传递
-                         !compareAndSetWaitStatus(h, 0, Node.PROPAGATE))
+                         !compareAndSetWaitStatus(h, 0, Node.PROPAGATE)) // 1、当头节点没有被改变的时候，运行到这里，更改ws的值，然后直接退出
+                                                                                                                            // 2、如果头节点被改变，那么循环（1）还要再走一次，然后退出
                     continue;                // loop on failed CAS
             }
             // 更改成功之后，跳出死循环
@@ -355,7 +358,45 @@ final boolean apparentlyFirstQueuedIsExclusive() {
                         // Releasing the read lock has no effect on readers,
                         // but it may allow waiting writers to proceed if
                         // both read and write locks are now free.
+                        // 一直到把所有的读锁(不包括加入到队列中的读锁)全部都释放完了
+                        // 然后执行doReleaseShared()方法，把锁传递给队列中等待的线程节点
                         return nextc == 0;
                 }
             }
+
+
+            ///
+
+                protected final boolean tryAcquire(int acquires) {
+                        /*
+                         * Walkthrough:
+                         * 1. If read count nonzero or write count nonzero
+                         *    and owner is a different thread, fail.
+                         * 2. If count would saturate, fail. (This can only
+                         *    happen if count is already nonzero.)
+                         * 3. Otherwise, this thread is eligible for lock if
+                         *    it is either a reentrant acquire or
+                         *    queue policy allows it. If so, update state
+                         *    and set owner.
+                         */
+                        Thread current = Thread.currentThread();
+                        int c = getState();
+                        int w = exclusiveCount(c);
+                        if (c != 0) {
+                            // (Note: if c != 0 and w == 0 then shared count != 0)
+                            if (w == 0 || current != getExclusiveOwnerThread())
+                                return false;
+                            if (w + exclusiveCount(acquires) > MAX_COUNT)
+                                throw new Error("Maximum lock count exceeded");
+                            // Reentrant acquire
+                            setState(c + acquires);
+                            return true;
+                        }
+                        if (writerShouldBlock() ||
+                            !compareAndSetState(c, c + acquires)) // 当前面的读锁全部被释放之后，会通知后续节点运行，然后此时有读锁进来，在这里读写开始竞争锁了
+                            return false;
+                        setExclusiveOwnerThread(current);
+                        return true;
+                    }
+
 
