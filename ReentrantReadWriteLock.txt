@@ -222,7 +222,8 @@ final boolean apparentlyFirstQueuedIsExclusive() {
                             int r = tryAcquireShared(arg);
                             // r>0说明获取到共享模式的锁
                             if (r >= 0) {
-                             // 如果共享锁的下一个节点也是共享模式的节点，那么通知释放下一个节点
+                            // 把当前的节点设置为头节点，并且把下一个共享模式的锁释放
+                            // 释放完了之后，如果之后的节点还是共享模式，那么就要一直释放下去。
                                 setHeadAndPropagate(node, r);
                                 p.next = null; // help GC
                                 if (interrupted)
@@ -399,5 +400,83 @@ final boolean apparentlyFirstQueuedIsExclusive() {
                         setExclusiveOwnerThread(current);
                         return true;
                     }
+
+// ---------WirterLock源码分析-------------
+
+
+  protected final boolean tryAcquire(int acquires) {
+            /*
+             * Walkthrough:
+             * 1. If read count nonzero or write count nonzero
+             *    and owner is a different thread, fail.
+             * 2. If count would saturate, fail. (This can only
+             *    happen if count is already nonzero.)
+             * 3. Otherwise, this thread is eligible for lock if
+             *    it is either a reentrant acquire or
+             *    queue policy allows it. If so, update state
+             *    and set owner.
+             */
+            Thread current = Thread.currentThread();
+            int c = getState();
+            int w = exclusiveCount(c);
+            if (c != 0) { // 说明锁被占领了,并且不是被自己占领的（不是重入），则返回false
+                // (Note: if c != 0 and w == 0 then shared count != 0)
+                if (w == 0 || current != getExclusiveOwnerThread())
+                    return false;
+                    // 如果是被自己占领，请没有超过最大重入次数，那么返回true
+                if (w + exclusiveCount(acquires) > MAX_COUNT)
+                    throw new Error("Maximum lock count exceeded");
+                // Reentrant acquire
+                setState(c + acquires);
+                return true;
+            }
+            // 如果队列中存在其他竞争的线程，writerShouldBlock()返回true，那么直接方法返回flase
+            // 如果队列中不存在其他线程，writerShouldBlock()返回false，当前线程进入竞争状态，竞争成功，返回true，否则返回false
+            if (writerShouldBlock() ||
+                !compareAndSetState(c, c + acquires))
+                return false;
+            setExclusiveOwnerThread(current);
+            return true;
+        }
+
+        //--writerShouldBlock()
+        对于非公平锁直接返回false,对于公平锁，则执行下面的方法
+         public final boolean hasQueuedPredecessors() {
+                // The correctness of this depends on head being initialized
+                // before tail and on head.next being accurate if the current
+                // thread is first in queue.
+                Node t = tail; // Read fields in reverse initialization order
+                Node h = head;
+                Node s;
+                // 队列中有节点，并且非当前的线程，返回true
+                return h != t &&
+                    ((s = h.next) == null || s.thread != Thread.currentThread());
+            }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
