@@ -222,6 +222,7 @@ final boolean apparentlyFirstQueuedIsExclusive() {
                             int r = tryAcquireShared(arg);
                             // r>0说明获取到共享模式的锁
                             if (r >= 0) {
+                             // 如果共享锁的下一个节点也是共享模式的节点，那么通知释放下一个节点
                                 setHeadAndPropagate(node, r);
                                 p.next = null; // help GC
                                 if (interrupted)
