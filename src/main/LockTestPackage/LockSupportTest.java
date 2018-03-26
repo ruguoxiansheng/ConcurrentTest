@@ -1,4 +1,4 @@
-package main;
+package main.LockTestPackage;
 
 import java.util.concurrent.locks.LockSupport;
 
