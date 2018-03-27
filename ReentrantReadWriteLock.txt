@@ -31,7 +31,7 @@ protected final int tryAcquireShared(int unused) {
 		getExclusiveOwnerThread() != current)
 		return -1;
 	int r = sharedCount(c); // 占有共享锁的线程数
-	if (!readerShouldBlock() && // 如果队列的头节点的next节点是独享锁即写锁，返回true
+	if (!readerShouldBlock() && // 如果队列的头节点的next节点是独享模式的线程节点即获取写锁的线程节点，返回true
 		r < MAX_COUNT && 	// 共享的数据不能超过65535
 		compareAndSetState(c, c + SHARED_UNIT)) {  // cas设置state
 		if (r == 0) {   // 线程来拿读锁，读锁和写锁没有被任何线程拥有，那么r==0
@@ -188,7 +188,7 @@ final boolean apparentlyFirstQueuedIsExclusive() {
              * @param arg the acquire argument
              */
              // 如果tryAcquireShared(arg) < 0，则来到这个方法。tryAcquireShared(arg) < 0条件成立的条件
-             // 1、tryAcquireShared 方法中，当有线程来申请共享锁的时候发现写锁已经被占领了，那么直接返回-1
+             // 1、tryAcquireShared 方法中，当有线程来申请读锁的时候发现写锁已经被占领了，那么直接返回-1
              // 2、fullTryAcquireShared 方法中，当有线程来申请共享锁的时候发现写锁已经被占领了，那么直接返回-1
              // 3、fullTryAcquireShared 方法中，在获取锁的队列中，排在最前面的获取锁的线程时独享模式，那么从readHolds中移除读锁的HoldCounter属性，然后返回-1
              // 总结：如果写锁被占领了，那么返回-1，如果在队列排在第一位的是独享锁（理想情况下，如果线程操作没有异常的话，独享锁肯定是排在第一位的，
