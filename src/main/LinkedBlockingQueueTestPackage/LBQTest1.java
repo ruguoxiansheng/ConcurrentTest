@@ -18,29 +18,29 @@ public class LBQTest1 {
         try {
             lbq.put("a");
             lbq.put("b");
-             Thread thread1 = new Thread() {
-                public void run() {
-                    try {
-                        lbq.put("c");
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                }
-            };
-             thread1.setName("thread-1");
-             thread1.start();
-            Thread.sleep(3000l);
-            Thread thread2 = new Thread() {
-                public void run() {
-                    try {
-                        lbq.put("d");
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                }
-            };
-            thread2.setName("thread-2");
-            thread2.start();
+//             Thread thread1 = new Thread() {
+//                public void run() {
+//                    try {
+//                        lbq.put("c");
+//                    } catch (InterruptedException e) {
+//                        e.printStackTrace();
+//                    }
+//                }
+//            };
+//             thread1.setName("thread-1");
+//             thread1.start();
+//            Thread.sleep(3000l);
+//            Thread thread2 = new Thread() {
+//                public void run() {
+//                    try {
+//                        lbq.put("d");
+//                    } catch (InterruptedException e) {
+//                        e.printStackTrace();
+//                    }
+//                }
+//            };
+//            thread2.setName("thread-2");
+//            thread2.start();
 
 //            Thread thread3 = new Thread() {
 //                public void run() {

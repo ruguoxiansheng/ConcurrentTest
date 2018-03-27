@@ -55,12 +55,14 @@
                 // 请求锁所有线程都被添加到等待队列中。
                 int savedState = fullyRelease(node);
                 int interruptMode = 0;
+                // 如果不在syncQueue队列中，那么返回false,线程进行阻塞。
                 while (!isOnSyncQueue(node)) {
                 // 请求的线程都阻塞在这里
                     LockSupport.park(this);
                     if ((interruptMode = checkInterruptWhileWaiting(node)) != 0)
                         break;
                 }
+                // 如果线程在syncQueue队列中
                 if (acquireQueued(node, savedState) && interruptMode != THROW_IE)
                     interruptMode = REINTERRUPT;
                 if (node.nextWaiter != null) // clean up if cancelled
@@ -90,10 +92,16 @@
             return node;
         }
 
-// 判断节点是否在同步队列中
+// 判断节点是否在同步队列(这个队列指的是锁队列)中
+// 在调用完fullyRelease(node)方法之后，各线程就可以自由竞争锁了
+// 此时有可能锁会被remove线程拿到，并且移除队列中的数据，然后调用signal方法，调用方法结束之后
+// Condition队列中的节点会被加入到SyncQueue中
+// 这两个队列的区别在于前者是单向的，每次添加尾节点，只会赋值nextWait，而syncQueue是一个双向的队列
    final boolean isOnSyncQueue(Node node) {
+   // 节点的添加都是从尾部添加，节点的提取都是从头部提取
                 if (node.waitStatus == Node.CONDITION || node.prev == null)
                     return false;
+                    // 如果存在继任节点，那么一定在syncQueue中
                 if (node.next != null) // If has successor, it must be on queue
                     return true;
                 /*
@@ -104,8 +112,53 @@
                  * unless the CAS failed (which is unlikely), it will be
                  * there, so we hardly ever traverse much.
                  */
+                 // node刚刚才加入到syncQueue中，所以next==null,所以要从尾部往前找
                 return findNodeFromTail(node);
             }
+    
+    
+    
+    
+ public final void signal() {
+ // 判断线程是否是独享模式
+                if (!isHeldExclusively())
+                    throw new IllegalMonitorStateException();
+                    // 从等待队列中拿出第一个
+                Node first = firstWaiter;
+                // 如果第一个为空，说明没有等待的线程，否则doSignal(first)
+                if (first != null)
+                    doSignal(first);
+            }
+ // 通知头节点           
+ private void doSignal(Node first) {
+        do {
+        // 设置first节点的nextWaiter为firstWaiter，如果是null，说明等待队列中只有一个节点
+        // 这行代码改变了头节点
+            if ( (firstWaiter = first.nextWaiter) == null)
+                lastWaiter = null;
+                // 这行代码将first这个节点与队列脱离了
+            first.nextWaiter = null;
+        } while (!transferForSignal(first) &&
+                 (first = firstWaiter) != null);
+    }
+
+// 
+final boolean transferForSignal(Node node) {
+/*
+ * If cannot change waitStatus, the node has been cancelled.
+ */
+ // 设置waitStatus =0
+if (!compareAndSetWaitStatus(node, Node.CONDITION, 0))
+    return false;
+
+// 设置成功之后入线程队列，返回的是前一个节点
+Node p = enq(node);
+int ws = p.waitStatus;// 获取到前一个节点的ws
+// 设置成功之后ws=0,设置前一个节点的状态为-1
+if (ws > 0 || !compareAndSetWaitStatus(p, ws, Node.SIGNAL))
+LockSupport.unpark(node.thread);
+return true;
+}
 
 
 

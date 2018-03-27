@@ -15,7 +15,13 @@
         Node<E> node = new Node<E>(e);
         final ReentrantLock putLock = this.putLock;
         final AtomicInteger count = this.count;
-        // 多个线程在此处竞争锁，这里是非公平竞争，竞争成功的拿到锁之后往下面走，没有竞争成功的加入到线程节点的队列中
+        // 多个线程在此处竞争锁，这里是非公平竞争，竞争成功的拿到锁之后往下面走，没有竞争成功的加入到线程节点的队列,这里称为syncQueue中
+     // 在LBQ(LinkedBlockingQueue)队列没有装满时，每次在最后释放锁之后，都会通知syncQueue队列的下一节点，
+     //并且与其他获取锁的线程（有可能是插入，也有可能是删除）竞争；
+     //假设1、这里有删除数据的线程参与竞争,假设方法是remove(Object o)，并且putLock被删除数据的线程给锁住了
+     // 删除节点之后，释放锁，相关的线程又陷入了锁的竞争中
+     // 
+     // 
         putLock.lockInterruptibly();
         try {
               // 当队列中存入的数据与容量大小一样时，需要将线程加入到等待队列中
@@ -55,12 +61,14 @@
                 // 请求锁所有线程都被添加到等待队列中。
                 int savedState = fullyRelease(node);
                 int interruptMode = 0;
+                // 如果不在syncQueue队列中，那么返回false,线程进行阻塞。
                 while (!isOnSyncQueue(node)) {
                 // 请求的线程都阻塞在这里
                     LockSupport.park(this);
                     if ((interruptMode = checkInterruptWhileWaiting(node)) != 0)
                         break;
                 }
+                // 如果线程在syncQueue队列中
                 if (acquireQueued(node, savedState) && interruptMode != THROW_IE)
                     interruptMode = REINTERRUPT;
                 if (node.nextWaiter != null) // clean up if cancelled
@@ -90,10 +98,16 @@
             return node;
         }
 
-// 判断节点是否在同步队列中
+// 判断节点是否在同步队列(这个队列指的是锁队列)中
+// 在调用完fullyRelease(node)方法之后，各线程就可以自由竞争锁了
+// 此时有可能锁会被remove线程拿到，并且移除队列中的数据，然后调用signal方法，调用方法结束之后
+// Condition队列中的节点会被加入到SyncQueue中
+// 这两个队列的区别在于前者是单向的，每次添加尾节点，只会赋值nextWait，而syncQueue是一个双向的队列
    final boolean isOnSyncQueue(Node node) {
+   // 节点的添加都是从尾部添加，节点的提取都是从头部提取
                 if (node.waitStatus == Node.CONDITION || node.prev == null)
                     return false;
+                    // 如果存在继任节点，那么一定在syncQueue中
                 if (node.next != null) // If has successor, it must be on queue
                     return true;
                 /*
@@ -104,6 +118,7 @@
                  * unless the CAS failed (which is unlikely), it will be
                  * there, so we hardly ever traverse much.
                  */
+                 // node刚刚才加入到syncQueue中，所以next==null,所以要从尾部往前找
                 return findNodeFromTail(node);
             }
     
