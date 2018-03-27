@@ -16,15 +16,14 @@
         final ReentrantLock putLock = this.putLock;
         final AtomicInteger count = this.count;
         // 多个线程在此处竞争锁，这里是非公平竞争，竞争成功的拿到锁之后往下面走，没有竞争成功的加入到线程节点的队列,这里称为syncQueue中
-     // 在LBQ(LinkedBlockingQueue)队列没有装满时，每次在最后释放锁之后，都会通知syncQueue队列的下一节点，
-     //并且与其他获取锁的线程（有可能是插入，也有可能是删除）竞争；
-     //假设1、这里有删除数据的线程参与竞争,假设方法是remove(Object o)，并且putLock被删除数据的线程给锁住了
-     // 删除节点之后，释放锁，相关的线程又陷入了锁的竞争中
-     // 
+     // 在LBQ(LinkedBlockingQueue)队列一直没有装满的条件下，锁的竞争与数据的删除分析的比较简单，这里主要分析
+     // 在LBQ装满的情况下锁的竞争。
+     // 假设LBQ的容量为2，有5个线程要往里面添加数据，并且都已经在syncQueue队列中排列好了
      // 
         putLock.lockInterruptibly();
         try {
               // 当队列中存入的数据与容量大小一样时，需要将线程加入到等待队列中
+              // 当第二个线程插入数据并且成功释放锁之后，syncQueue中的第三个线程成功来到了这里
             while (count.get() == capacity) {
                 notFull.await();
             }
@@ -55,7 +54,7 @@
       public final void await() throws InterruptedException {
                 if (Thread.interrupted())
                     throw new InterruptedException();
-                    // 将当前线程往等待队列中添加
+                    // 将当前线程往ConditinoQueue等待队列中添加
                 Node node = addConditionWaiter();
                 // 添加完成之后，通知锁队列中的下一个线程节点，让其运行，这样锁的等待队列中就没有获取锁的线程在等待了。
                 // 请求锁所有线程都被添加到等待队列中。
