@@ -143,7 +143,8 @@
                 if (first != null)
                     doSignal(first);
             }
- // 通知头节点           
+ // 通知ConditionQueue中的头节点，并将头节点放置到SyncQueue中。如果SyncQueue队列中已经是空，那么ConditionQueue头节点就会
+          // 被添加到SyncQueue中，然后锁被释放，被移动到SyncQueue队列中的节点获取到锁之后开始插入数据。
  private void doSignal(Node first) {
         do {
         // 设置first节点的nextWaiter为firstWaiter，如果是null，说明等待队列中只有一个节点
@@ -168,7 +169,7 @@ if (!compareAndSetWaitStatus(node, Node.CONDITION, 0))
 // 设置成功之后入线程队列，返回的是前一个节点
 Node p = enq(node);
 int ws = p.waitStatus;// 获取到前一个节点的ws
-// 设置成功之后ws=0,设置前一个节点的状态为-1
+// 设置成功之后ws=0,设置前一个节点的状态为-1。如果线程节点被取消了，那么取消线程的阻塞。
 if (ws > 0 || !compareAndSetWaitStatus(p, ws, Node.SIGNAL))
 LockSupport.unpark(node.thread);
 return true;

@@ -12,7 +12,6 @@ import java.util.concurrent.LinkedBlockingQueue;
  if ((interruptMode = checkInterruptWhileWaiting(node)) != 0)
  break;
  }
- *
  */
 public class LBQTest4 {
 
