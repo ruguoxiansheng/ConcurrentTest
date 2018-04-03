@@ -156,7 +156,7 @@
                  (first = firstWaiter) != null);
     }
 
-// ? 把ConditionQueue中的节点参数再移动到SyncQueue中(LBQTest4)
+// 把ConditionQueue中的节点参数再移动到SyncQueue中(LBQTest4)
 final boolean transferForSignal(Node node) {
 /*
  * If cannot change waitStatus, the node has been cancelled.
