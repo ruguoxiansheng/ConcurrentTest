@@ -3,7 +3,7 @@
   /**
      * Inserts the specified element at the tail of this queue, waiting if
      * necessary for space to become available.
-     *
+     *插入元素在队列尾部，一直等待直到有存储空间
      * @throws InterruptedException {@inheritDoc}
      * @throws NullPointerException {@inheritDoc}
      */
@@ -66,7 +66,7 @@
                     // 将当前线程往ConditinoQueue等待队列中添加
                 Node node = addConditionWaiter();
                 // 添加完成之后，并把锁传递给syncQueue中的下一个节点t2，在没有意外的情况下，t2会沿着t1的道路走一遍
-                // 请求锁所有线程都被添加到等待队列ConditionQueue中。
+                //如果LBQ队列中的元素一直没有被删除，那么请求锁所有线程都被添加到等待队列ConditionQueue中。(LBQTest3)
                 int savedState = fullyRelease(node);
                 int interruptMode = 0;
                 // 如果不在syncQueue队列中，那么返回false,线程进行阻塞。
@@ -106,7 +106,7 @@
             return node;
         }
 
-// 判断节点是否在同步队列(这个队列指的是锁队列)中
+// 判断节点是否在同步队列syncQueue中
 // 在调用完fullyRelease(node)方法之后，各线程就可以自由竞争锁了
 // 此时有可能锁会被remove线程拿到，并且移除队列中的数据，然后调用signal方法，调用方法结束之后
 // Condition队列中的节点会被加入到SyncQueue中
@@ -156,7 +156,7 @@
                  (first = firstWaiter) != null);
     }
 
-// 
+// ? 把ConditionQueue中的节点参数再移动到SyncQueue中(LBQTest4)
 final boolean transferForSignal(Node node) {
 /*
  * If cannot change waitStatus, the node has been cancelled.
