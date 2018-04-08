@@ -139,7 +139,7 @@
                     throw new IllegalMonitorStateException();
                     // 从等待队列中拿出第一个
                 Node first = firstWaiter;
-                // 如果第一个为空，说明没有等待的线程，否则doSignal(first)
+                // 如果第一个为空，说明没有等待的线程(在LBQ没有满的时候，first==null)，否则doSignal(first)
                 if (first != null)
                     doSignal(first);
             }
@@ -158,6 +158,14 @@
     }
 
 // 把ConditionQueue中的节点参数再移动到SyncQueue中(LBQTest4)
+// 如果此时SyncQueue中存在线程节点，
+//那么从ConditionQueue队列中移送到SyncQueue队列中的节点就会被添加在结尾，
+//但是这个节点阻塞却在await()方法中。
+//此时存在的问题没有想通，情景如下：
+//在SyncQueue存在2个线程等待的节点，ConditionQueue的头节点t，在remove()方法执行之后被
+//加入到SyncQueue队列的末尾，但是t的线程却在await()方法中的acquirequeue方法中阻塞，当SyncQueue队列中的
+//线程获取到锁之后继续执行的话，t节点拿到锁执行，会不会有问题。(我重写了LBQ，在LBQTest5验证这个问题)
+
 final boolean transferForSignal(Node node) {
 /*
  * If cannot change waitStatus, the node has been cancelled.
