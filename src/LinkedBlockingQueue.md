@@ -188,6 +188,39 @@ return true;
 
 
 
+// offer(Object o),往队列的尾部插入数据，如果队列满了，直接返回false
+
+public boolean offer(E e) {
+// 如果插入的数据为空，抛出异常
+if (e == null) throw new NullPointerException();
+final AtomicInteger count = this.count;
+// 如果队列满了，返回false
+if (count.get() == capacity)
+    return false;
+int c = -1;
+Node<E> node = new Node<E>(e);
+final ReentrantLock putLock = this.putLock;
+putLock.lock();
+try {
+    if (count.get() < capacity) {
+        enqueue(node);
+        c = count.getAndIncrement();
+        if (c + 1 < capacity)
+            notFull.signal();
+    }
+} finally {
+    putLock.unlock();
+}
+if (c == 0)
+    signalNotEmpty();
+return c >= 0;
+}
+
+
+
+
+
+
 
 
 
