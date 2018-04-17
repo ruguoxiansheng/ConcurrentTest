@@ -239,6 +239,45 @@ return c >= 0;
             takeLock.unlock();
         }
     }
+    
+    
+/**
+*如果在规定的时间内等待队列中有空间，插入指定的数据在队列的末尾
+* Inserts the specified element at the tail of this queue, waiting if
+* necessary up to the specified wait time for space to become available.
+*如果成功，返回true，如果在指定的时间内没有获取到空间，则返回false
+* @return {@code true} if successful, or {@code false} if
+*         the specified waiting time elapses before space is available
+* @throws InterruptedException {@inheritDoc}
+* @throws NullPointerException {@inheritDoc}
+*/
+public boolean offer(E e, long timeout, TimeUnit unit)
+throws InterruptedException {
+
+if (e == null) throw new NullPointerException();
+// 将制定单位的时间换算成纳秒的形式
+long nanos = unit.toNanos(timeout);
+int c = -1;
+final ReentrantLock putLock = this.putLock;
+final AtomicInteger count = this.count;
+putLock.lockInterruptibly();
+try {
+while (count.get() == capacity) {
+    if (nanos <= 0)
+        return false;
+    nanos = notFull.awaitNanos(nanos);
+}
+enqueue(new Node<E>(e));
+c = count.getAndIncrement();
+if (c + 1 < capacity)
+    notFull.signal();
+} finally {
+putLock.unlock();
+}
+if (c == 0)
+signalNotEmpty();
+return true;
+}
 
 
 
