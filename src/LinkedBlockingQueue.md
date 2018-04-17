@@ -200,21 +200,45 @@ if (count.get() == capacity)
 int c = -1;
 Node<E> node = new Node<E>(e);
 final ReentrantLock putLock = this.putLock;
+// 线程在此拿锁，如果拿不到锁就会加入到synqueue,并且阻塞住
 putLock.lock();
+// 节点拿到锁
 try {
+// 如果count < capacity，就将节点入队列
     if (count.get() < capacity) {
+    // 将节点入链表末尾
         enqueue(node);
+        // 
         c = count.getAndIncrement();
         if (c + 1 < capacity)
+        // 如果链表没有满，就会通知ConditionQueue的节点
+        // 如果在一个方法中只调用了offer这个方法，那么ConditionQueue队列是空的，notFull.signal()是为了
+        //防止调用了其他的方法，会往ConditionQueue节点添加数据
             notFull.signal();
     }
 } finally {
     putLock.unlock();
 }
 if (c == 0)
+// 在添加了一条数据成功之后，要通知taken队列链表已经不是空的了，可以取数据了
     signalNotEmpty();
 return c >= 0;
 }
+
+   /**
+     * Signals a waiting take. Called only from put/offer (which do not
+     * otherwise ordinarily lock takeLock.)
+     */
+    private void signalNotEmpty() {
+        final ReentrantLock takeLock = this.takeLock;
+        takeLock.lock();
+        try {
+        // 注意这里通知的队列是token队列
+            notEmpty.signal();
+        } finally {
+            takeLock.unlock();
+        }
+    }
 
 
 
