@@ -200,20 +200,83 @@ if (count.get() == capacity)
 int c = -1;
 Node<E> node = new Node<E>(e);
 final ReentrantLock putLock = this.putLock;
+// 线程在此拿锁，如果拿不到锁就会加入到synqueue,并且阻塞住
 putLock.lock();
+// 节点拿到锁
 try {
+// 如果count < capacity，就将节点入队列
     if (count.get() < capacity) {
+    // 将节点入链表末尾
         enqueue(node);
+        // 
         c = count.getAndIncrement();
         if (c + 1 < capacity)
+        // 如果链表没有满，就会通知ConditionQueue的节点
+        // 如果在一个方法中只调用了offer这个方法，那么ConditionQueue队列是空的，notFull.signal()是为了
+        //防止调用了其他的方法，会往ConditionQueue节点添加数据
             notFull.signal();
     }
 } finally {
     putLock.unlock();
 }
 if (c == 0)
+// 在添加了一条数据成功之后，要通知taken队列链表已经不是空的了，可以取数据了
     signalNotEmpty();
 return c >= 0;
+}
+
+   /**
+     * Signals a waiting take. Called only from put/offer (which do not
+     * otherwise ordinarily lock takeLock.)
+     */
+    private void signalNotEmpty() {
+        final ReentrantLock takeLock = this.takeLock;
+        takeLock.lock();
+        try {
+        // 注意这里通知的队列是token队列
+            notEmpty.signal();
+        } finally {
+            takeLock.unlock();
+        }
+    }
+    
+    
+/**
+*如果在规定的时间内等待队列中有空间，插入指定的数据在队列的末尾
+* Inserts the specified element at the tail of this queue, waiting if
+* necessary up to the specified wait time for space to become available.
+*如果成功，返回true，如果在指定的时间内没有获取到空间，则返回false
+* @return {@code true} if successful, or {@code false} if
+*         the specified waiting time elapses before space is available
+* @throws InterruptedException {@inheritDoc}
+* @throws NullPointerException {@inheritDoc}
+*/
+public boolean offer(E e, long timeout, TimeUnit unit)
+throws InterruptedException {
+
+if (e == null) throw new NullPointerException();
+// 将制定单位的时间换算成纳秒的形式
+long nanos = unit.toNanos(timeout);
+int c = -1;
+final ReentrantLock putLock = this.putLock;
+final AtomicInteger count = this.count;
+putLock.lockInterruptibly();
+try {
+while (count.get() == capacity) {
+    if (nanos <= 0)
+        return false;
+    nanos = notFull.awaitNanos(nanos);
+}
+enqueue(new Node<E>(e));
+c = count.getAndIncrement();
+if (c + 1 < capacity)
+    notFull.signal();
+} finally {
+putLock.unlock();
+}
+if (c == 0)
+signalNotEmpty();
+return true;
 }
 
 
