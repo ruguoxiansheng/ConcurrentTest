@@ -260,9 +260,12 @@ long nanos = unit.toNanos(timeout);
 int c = -1;
 final ReentrantLock putLock = this.putLock;
 final AtomicInteger count = this.count;
+// 获取到锁，支持中断，线程中断之后抛出异常
 putLock.lockInterruptibly();
 try {
+// 如果队列已经满了
 while (count.get() == capacity) {
+// 并且等待时间《=0，那么直接返回false
     if (nanos <= 0)
         return false;
     nanos = notFull.awaitNanos(nanos);
@@ -281,7 +284,36 @@ return true;
 
 
 
-
+public final long awaitNanos(long nanosTimeout)
+                throws InterruptedException {
+            if (Thread.interrupted())
+                throw new InterruptedException();
+            Node node = addConditionWaiter();
+            int savedState = fullyRelease(node);
+            // 用等待的时间+系统时间=最后的时刻期限
+            final long deadline = System.nanoTime() + nanosTimeout;
+            int interruptMode = 0;
+            // 如果节点不在等待都列中
+            while (!isOnSyncQueue(node)) {
+            // 如果等待的最后期限《0
+                if (nanosTimeout <= 0L) {
+                    transferAfterCancelledWait(node);
+                    break;
+                }
+                if (nanosTimeout >= spinForTimeoutThreshold)
+                    LockSupport.parkNanos(this, nanosTimeout);
+                if ((interruptMode = checkInterruptWhileWaiting(node)) != 0)
+                    break;
+                nanosTimeout = deadline - System.nanoTime();
+            }
+            if (acquireQueued(node, savedState) && interruptMode != THROW_IE)
+                interruptMode = REINTERRUPT;
+            if (node.nextWaiter != null)
+                unlinkCancelledWaiters();
+            if (interruptMode != 0)
+                reportInterruptAfterWait(interruptMode);
+            return deadline - System.nanoTime();
+        }
 
 
 
